@@ -70,11 +70,16 @@ void ui_update_params(UIState *s) {
 void UIState::updateStatus() {
   if (scene.started && sm->updated("selfdriveState")) {
     auto ss = (*sm)["selfdriveState"].getSelfdriveState();
+    auto cs = (*sm)["carState"].getCarState();
     auto state = ss.getState();
     if (state == cereal::SelfdriveState::OpenpilotState::PRE_ENABLED || state == cereal::SelfdriveState::OpenpilotState::OVERRIDING) {
       status = STATUS_OVERRIDE;
+    } else if (ss.getEnabled()) {
+      status = STATUS_ENGAGED;
+    } else if (cs.getCruiseState().getAvailable()) {
+      status = STATUS_CRUISE_AVAILABLE;
     } else {
-      status = ss.getEnabled() ? STATUS_ENGAGED : STATUS_DISENGAGED;
+      status = STATUS_DISENGAGED;
     }
   }
 

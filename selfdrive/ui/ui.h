@@ -42,12 +42,14 @@ typedef enum UIStatus {
   STATUS_DISENGAGED,
   STATUS_OVERRIDE,
   STATUS_ENGAGED,
+  STATUS_CRUISE_AVAILABLE,
 } UIStatus;
 
 const QColor bg_colors [] = {
   [STATUS_DISENGAGED] = QColor(0x17, 0x33, 0x49, 0xc8),
   [STATUS_OVERRIDE] = QColor(0x91, 0x9b, 0x95, 0xf1),
   [STATUS_ENGAGED] = QColor(0x17, 0x86, 0x44, 0xf1),
+  [STATUS_CRUISE_AVAILABLE] = QColor(0x6f, 0xc0, 0xc9, 0xf1),
 };
 
 typedef struct UIScene {
@@ -102,6 +104,9 @@ public:
   void setOffroadBrightness(int brightness) {
     offroad_brightness = std::clamp(brightness, 0, 100);
   }
+  // XXX: This patch uses its own boolean instead of a state in order
+  // to keep it isolated from the rest of the code.
+  bool alwaysOnLateralActive = false;
 
 private:
   bool awake = false;

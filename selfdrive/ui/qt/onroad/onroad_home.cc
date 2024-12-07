@@ -48,6 +48,7 @@ void OnroadWindow::updateState(const UIState &s) {
   nvg->updateState(s);
 
   QColor bgColor = bg_colors[s.status];
+
   if (bg != bgColor) {
     // repaint border
     bg = bgColor;
