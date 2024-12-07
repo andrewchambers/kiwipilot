@@ -16,12 +16,14 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.gps import get_gps_location_service
 
 from openpilot.selfdrive.car.car_specific import CarSpecificEvents
-from openpilot.selfdrive.selfdrived.events import Events, ET
+from openpilot.selfdrive.selfdrived.events import Events, ET, EngagementAlert
 from openpilot.selfdrive.selfdrived.state import StateMachine
 from openpilot.selfdrive.selfdrived.alertmanager import AlertManager, set_offroad_alert
 from openpilot.selfdrive.controls.lib.latcontrol import MIN_LATERAL_CONTROL_SPEED
 
 from openpilot.system.version import get_build_metadata
+
+AudibleAlert = car.CarControl.HUDControl.AudibleAlert
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -36,6 +38,7 @@ LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
 EventName = log.OnroadEvent.EventName
 ButtonType = car.CarState.ButtonEvent.Type
+GearShifter = car.CarState.GearShifter
 SafetyModel = car.CarParams.SafetyModel
 
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
@@ -102,6 +105,7 @@ class SelfdriveD:
     self.initialized = False
     self.enabled = False
     self.active = False
+    self.always_on_lateral_active = False
     self.mismatch_counter = 0
     self.cruise_mismatch_counter = 0
     self.last_steering_pressed_frame = 0
@@ -419,8 +423,18 @@ class SelfdriveD:
     pers = LONGITUDINAL_PERSONALITY_MAP[self.personality]
     alerts = self.events.create_alerts(self.state_machine.current_alert_types, [self.CP, CS, self.sm, self.is_metric,
                                                                                 self.state_machine.soft_disable_timer, pers])
+    #if self.want_always_on_lateral_alert:
+    #  if self.always_on_lateral_active:
+    #    alerts.append(EngagementAlert(AudibleAlert.engage))
+    #  else:
+    #    alerts.append(EngagementAlert(AudibleAlert.disengage))
+
     self.AM.add_many(self.sm.frame, alerts)
     self.AM.process_alerts(self.sm.frame, clear_event_types)
+
+  def update_always_on_lateral(self, CS):
+    in_driving_gear = CS.gearShifter not in (GearShifter.neutral, GearShifter.park, GearShifter.reverse, GearShifter.unknown)
+    self.always_on_lateral_active = CS.cruiseState.available and in_driving_gear and (not CS.standstill)
 
   def publish_selfdriveState(self, CS):
     # selfdriveState
@@ -429,6 +443,7 @@ class SelfdriveD:
     ss = ss_msg.selfdriveState
     ss.enabled = self.enabled
     ss.active = self.active
+    ss.alwaysOnLateralActive = self.always_on_lateral_active
     ss.state = self.state_machine.state
     ss.engageable = not self.events.contains(ET.NO_ENTRY)
     ss.experimentalMode = self.experimental_mode
@@ -456,8 +471,8 @@ class SelfdriveD:
     self.update_events(CS)
     if not self.CP.passive and self.initialized:
       self.enabled, self.active = self.state_machine.update(self.events)
+    self.update_always_on_lateral(CS)
     self.update_alerts(CS)
-
     self.publish_selfdriveState(CS)
 
     self.CS_prev = CS

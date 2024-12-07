@@ -805,6 +805,7 @@ struct SelfdriveState {
   state @0 :OpenpilotState;
   enabled @1 :Bool;
   active @2 :Bool;
+  alwaysOnLateralActive @13 :Bool;
   engageable @9 :Bool;  # can OP be engaged?
 
   # UI alerts
