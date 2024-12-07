@@ -205,6 +205,7 @@ extern struct sample_t vehicle_speed;
 extern bool vehicle_moving;
 extern bool acc_main_on; // referred to as "ACC off" in ISO 15622:2018
 extern int cruise_button_prev;
+extern int cruise_main_prev;
 extern bool safety_rx_checks_invalid;
 
 // for safety modes with torque steering control
@@ -243,6 +244,9 @@ extern struct sample_t angle_meas;         // last 6 steer angles/curvatures
 
 // This flag allows AEB to be commanded from openpilot.
 #define ALT_EXP_ALLOW_AEB 16
+
+// This flag allows always on lateral control.
+#define ALT_EXP_ALWAYS_ON_LATERAL 32
 
 extern int alternative_experience;
 
