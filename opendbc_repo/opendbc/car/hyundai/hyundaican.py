@@ -1,4 +1,7 @@
 import crcmod
+from dataclasses import dataclass
+from opendbc.car import structs
+from opendbc.car.common.numpy_fast import clip
 from opendbc.car.hyundai.values import CAR, HyundaiFlags
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
@@ -123,7 +126,51 @@ def create_lfahda_mfc(packer, enabled):
   }
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
-def create_acc_commands(packer, enabled, accel, upper_jerk, idx, hud_control, set_speed, stopping, long_override, use_fca, cruise_available, CP):
+@dataclass
+class HyundaiCANJerkParams:
+  jerk_u: float
+  jerk_l: float
+  cb_upper: float
+  cb_lower: float
+
+LongCtrlState = structs.CarControl.Actuators.LongControlState
+
+# This calculation was derived from reverse engineering by CarrotMaster on discord.
+def compute_jerk_params(CS, accel, actuators):
+  #  jerk_u_min = 0.5
+  #
+  #  # Compute base jerk
+  #  if actuators.longControlState == LongCtrlState.stopping:
+  #    jerk = (jerk_u_min / 2.0) - CS.out.aEgo
+  #  elif actuators.longControlState == LongCtrlState.pid:
+  #    jerk = actuators.jerk
+  #  else:
+  #    jerk = 0.0
+  #
+  #  # Define maximum jerk limits
+  #  jerk_max_l = 5.0
+  #  jerk_max_u = jerk_max_l
+  #
+  #  # Compute jerk bounds and cb values depending on the long control state and CS
+  #  if actuators.longControlState != LongCtrlState.off:
+  #    jerk_u = min(max(jerk_u_min, jerk * 2.0), jerk_max_u)
+  #    jerk_l = min(max(1.0, -jerk * 2.0), jerk_max_l)
+  #    cb_upper = clip(0.9 + accel * 0.2, 0, 1.2)
+  #    cb_lower = clip(0.8 + accel * 0.2, 0, 1.2)
+  #  else:
+  #    jerk_u = jerk_max_u
+  #    jerk_l = jerk_max_l
+  #    cb_upper = 0.0
+  #    cb_lower = 0.0
+  #
+  #  return HyundaiCANJerkParams(
+  #    jerk_u=jerk_u, jerk_l=jerk_l, cb_upper=cb_upper, cb_lower=cb_lower
+  #  )
+  return HyundaiCANJerkParams(
+    jerk_u=9.0, jerk_l=0.0, cb_upper=0.0, cb_lower=0.0
+  )
+
+def create_acc_commands(packer, enabled, accel, jerk_params, idx, hud_control, set_speed, stopping, long_override, use_fca, cruise_available, CP):
   commands = []
 
   scc11_values = {
@@ -159,10 +206,10 @@ def create_acc_commands(packer, enabled, accel, upper_jerk, idx, hud_control, se
   commands.append(packer.make_can_msg("SCC12", 0, scc12_values))
 
   scc14_values = {
-    "ComfortBandUpper": 0.0, # stock usually is 0 but sometimes uses higher values
-    "ComfortBandLower": 0.0, # stock usually is 0 but sometimes uses higher values
-    "JerkUpperLimit": upper_jerk, # stock usually is 1.0 but sometimes uses higher values
-    "JerkLowerLimit": 5.0, # stock usually is 0.5 but sometimes uses higher values
+    "ComfortBandUpper": jerk_params.cb_upper,
+    "ComfortBandLower": jerk_params.cb_lower,
+    "JerkUpperLimit": jerk_params.jerk_u,
+    "JerkLowerLimit": jerk_params.jerk_l,
     "ACCMode": 2 if enabled and long_override else 1 if enabled else 4, # stock will always be 4 instead of 0 after first disengage
     "ObjGap": 2 if hud_control.leadVisible else 0, # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
   }
